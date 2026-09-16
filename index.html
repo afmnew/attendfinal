@@ -144,8 +144,17 @@
         genBtn.innerText = "Generating token...";
 
         try {
-          const res = await fetch(`${APPS_SCRIPT_URL}?action=sign&sheetId=${cleanSheetId}&start=${sMs}&end=${eMs}`);
-          const signData = await res.json();
+          const res = await fetch(`${APPS_SCRIPT_URL}?action=sign&sheetId=${cleanSheetId}&start=${sMs}&end=${eMs}`, {
+            redirect: "follow"
+          });
+          const rawText = await res.text();
+          let signData;
+          try {
+            signData = JSON.parse(rawText);
+          } catch (e) {
+            throw new Error("Apps Script permissions error. Ensure 'Who has access' is set to 'Anyone'.");
+          }
+
           studentUrl += `&start=${sMs}&end=${eMs}&token=${signData.token}`;
         } catch(e) {
           alert("Could not create signed token: " + e.message);
@@ -184,7 +193,6 @@
       return uuid;
     }
 
-    // Explicit Geolocation Handler that rejects instead of silently outputting 0
     function fetchCurrentPosition() {
       return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -193,7 +201,6 @@
         navigator.geolocation.getCurrentPosition(
           (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
           (err) => {
-            // If GPS high-accuracy fails, try standard accuracy once before rejecting
             navigator.geolocation.getCurrentPosition(
               (pos2) => resolve({ lat: pos2.coords.latitude, lon: pos2.coords.longitude }),
               () => {
@@ -214,7 +221,6 @@
     function initStudentView() {
       const msg = document.getElementById("statusMsg");
 
-      // Pre-warm location permission when the page opens
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 3000 });
       }
@@ -251,7 +257,7 @@
           msg.style.color = "#d9534f";
           msg.innerText = "❌ " + locErr.message;
           submitBtn.disabled = false;
-          return; // Blocks submission with 0 coordinates
+          return;
         }
 
         msg.innerText = "Submitting attendance...";
@@ -272,11 +278,19 @@
 
           const res = await fetch(APPS_SCRIPT_URL, {
             method: "POST",
+            redirect: "follow",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(payload)
           });
 
-          const data = await res.json();
+          const rawText = await res.text();
+          let data;
+          try {
+            data = JSON.parse(rawText);
+          } catch (jsonErr) {
+            throw new Error("Server returned HTML instead of JSON. Ensure Apps Script deployment access is set to 'Anyone'.");
+          }
+
           if (data.status === "success") {
             msg.style.color = "#28a745";
             msg.innerText = data.message;
