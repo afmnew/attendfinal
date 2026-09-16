@@ -100,7 +100,7 @@
   </div>
 
   <script>
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7y3qlQNRcCTMvkKkK5pYv78fSw0nYtUNyGt0A-ya45QHF_0TA4aq3xR4wx71kXN4/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFsDMMj86NrnnQKJ3c8yKhLF90W2nDBLd08Nun6gHXG-OwMM05HZWdvU7oV6qeu8tm/exec";
 
     const urlParams = new URLSearchParams(window.location.search);
     const sheetId = urlParams.get("sheetId");
@@ -152,11 +152,11 @@
           try {
             signData = JSON.parse(rawText);
           } catch (e) {
-            throw new Error("Apps Script permissions error. Ensure 'Who has access' is set to 'Anyone'.");
+            throw new Error("Apps Script returned HTML. Ensure the deployment allows access to 'Anyone'.");
           }
 
           studentUrl += `&start=${sMs}&end=${eMs}&token=${signData.token}`;
-        } catch(e) {
+        } catch (e) {
           alert("Could not create signed token: " + e.message);
           genBtn.disabled = false;
           genBtn.innerText = "Create Classroom QR";
@@ -193,6 +193,7 @@
       return uuid;
     }
 
+    // High-speed location lookup: checks cached hardware GPS first, 4s hard timeout
     function fetchCurrentPosition() {
       return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -201,19 +202,13 @@
         navigator.geolocation.getCurrentPosition(
           (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
           (err) => {
-            navigator.geolocation.getCurrentPosition(
-              (pos2) => resolve({ lat: pos2.coords.latitude, lon: pos2.coords.longitude }),
-              () => {
-                let reason = "Please enable Location/GPS in your browser settings to submit attendance.";
-                if (err.code === 1) reason = "Location permission denied. Please allow location access in your browser settings.";
-                else if (err.code === 2) reason = "Location unavailable. Please make sure phone GPS is enabled.";
-                else if (err.code === 3) reason = "Location request timed out. Please try again with GPS active.";
-                reject(new Error(reason));
-              },
-              { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-            );
+            let reason = "Please enable GPS/Location in your browser settings to submit attendance.";
+            if (err.code === 1) reason = "Location permission denied. Please allow location access in your browser.";
+            else if (err.code === 2) reason = "GPS signal unavailable. Please ensure phone location is enabled.";
+            else if (err.code === 3) reason = "Location request timed out. Please try again with GPS turned on.";
+            reject(new Error(reason));
           },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+          { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
         );
       });
     }
@@ -221,8 +216,9 @@
     function initStudentView() {
       const msg = document.getElementById("statusMsg");
 
+      // Prime device location silently in the background on load
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 3000 });
+        navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 2000, maximumAge: 60000 });
       }
 
       if (startMs && endMs) {
@@ -248,7 +244,7 @@
         const submitBtn = document.getElementById("submitBtn");
         submitBtn.disabled = true;
         msg.style.color = "#0066cc";
-        msg.innerText = "Acquiring GPS location...";
+        msg.innerText = "Checking location...";
 
         let location;
         try {
@@ -288,7 +284,7 @@
           try {
             data = JSON.parse(rawText);
           } catch (jsonErr) {
-            throw new Error("Server returned HTML instead of JSON. Ensure Apps Script deployment access is set to 'Anyone'.");
+            throw new Error("Server returned HTML instead of JSON. Ensure Apps Script deployment is set to 'Anyone' and updated to a New Version.");
           }
 
           if (data.status === "success") {
