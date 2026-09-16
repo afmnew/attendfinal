@@ -17,6 +17,7 @@
     #qrcode { display: flex; justify-content: center; margin: 20px 0; }
     .status-msg { margin-top: 15px; font-size: 14px; font-weight: 500; text-align: center; line-height: 1.4; }
     .session-info { background: #eaf3ff; border-left: 4px solid #0066cc; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 15px; }
+    .instructions { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 13px; color: #333; line-height: 1.5; margin-bottom: 15px; }
   </style>
 </head>
 <body>
@@ -30,9 +31,10 @@
         <ol style="margin: 8px 0 0 0; padding-left: 20px;">
           <li>Create a new blank <a href="https://sheets.new" target="_blank">Google Sheet</a>.</li>
           <li>Click <strong>Share</strong> and add the administrator's email as an <strong>Editor</strong>.</li>
-          <li>Paste your Google Sheet link below and click <strong>Generate QR Code</strong>.</li>
+          <li>Paste your Google Sheet link below and click <strong>Create Classroom QR</strong>.</li>
         </ol>
       </div>
+
       <label for="sheetInput">Google Sheet Link</label>
       <input type="text" id="sheetInput" placeholder="Paste link here">
 
@@ -54,7 +56,6 @@
     <div id="studentView" style="display: none;">
       <h2>Record Attendance</h2>
       <form id="attendanceForm">
-        <!-- Student ID now accepts ANY string format -->
         <label for="studentId">Student ID</label>
         <input type="text" id="studentId" required placeholder="Enter ID">
 
@@ -183,21 +184,26 @@
       return uuid;
     }
 
-    // Helper: Promisified location request with fallback
+    // Explicit Geolocation Handler that rejects instead of silently outputting 0
     function fetchCurrentPosition() {
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
-          return resolve({ lat: 0, lon: 0 });
+          return reject(new Error("Geolocation is not supported by your browser."));
         }
         navigator.geolocation.getCurrentPosition(
           (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
           (err) => {
-            console.warn("High accuracy geolocation error:", err.message);
-            // Fallback try without high accuracy
+            // If GPS high-accuracy fails, try standard accuracy once before rejecting
             navigator.geolocation.getCurrentPosition(
               (pos2) => resolve({ lat: pos2.coords.latitude, lon: pos2.coords.longitude }),
-              () => resolve({ lat: 0, lon: 0 }),
-              { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+              () => {
+                let reason = "Please enable Location/GPS in your browser settings to submit attendance.";
+                if (err.code === 1) reason = "Location permission denied. Please allow location access in your browser settings.";
+                else if (err.code === 2) reason = "Location unavailable. Please make sure phone GPS is enabled.";
+                else if (err.code === 3) reason = "Location request timed out. Please try again with GPS active.";
+                reject(new Error(reason));
+              },
+              { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
             );
           },
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
@@ -207,6 +213,11 @@
 
     function initStudentView() {
       const msg = document.getElementById("statusMsg");
+
+      // Pre-warm location permission when the page opens
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 3000 });
+      }
 
       if (startMs && endMs) {
         const now = Date.now();
@@ -231,9 +242,19 @@
         const submitBtn = document.getElementById("submitBtn");
         submitBtn.disabled = true;
         msg.style.color = "#0066cc";
-        msg.innerText = "Getting location & submitting attendance...";
+        msg.innerText = "Acquiring GPS location...";
 
-        const location = await fetchCurrentPosition();
+        let location;
+        try {
+          location = await fetchCurrentPosition();
+        } catch (locErr) {
+          msg.style.color = "#d9534f";
+          msg.innerText = "❌ " + locErr.message;
+          submitBtn.disabled = false;
+          return; // Blocks submission with 0 coordinates
+        }
+
+        msg.innerText = "Submitting attendance...";
 
         try {
           const payload = {
