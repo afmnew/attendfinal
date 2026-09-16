@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classroom Attendance Portal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; box-sizing: border-box; }
+    .card { background: #ffffff; width: 100%; max-width: 440px; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    h2 { margin-top: 0; color: #1a1a1a; font-size: 22px; text-align: center; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-top: 12px; margin-bottom: 4px; }
+    .optional-tag { font-weight: normal; color: #777; font-size: 12px; }
+    input[type="text"], input[type="datetime-local"], select { width: 100%; padding: 10px 12px; border: 1px solid #ccd0d5; border-radius: 6px; font-size: 15px; box-sizing: border-box; background-color: #fff; }
+    button { width: 100%; padding: 12px; background-color: #0066cc; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; margin-top: 18px; cursor: pointer; }
+    button:disabled { background-color: #999; cursor: not-allowed; }
+    #qrcode { display: flex; justify-content: center; margin: 20px 0; }
+    .status-msg { margin-top: 15px; font-size: 14px; font-weight: 500; text-align: center; line-height: 1.4; }
+    .session-info { background: #eaf3ff; border-left: 4px solid #0066cc; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 15px; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <!-- VIEW A: TEACHER GENERATOR -->
+    <div id="teacherView" style="display: none;">
+      <h2>Generate Attendance QR</h2>
+      <label for="sheetInput">Google Sheet Link or ID</label>
+      <input type="text" id="sheetInput" placeholder="Paste link or ID here">
+
+      <label for="startTime">Open Time <span class="optional-tag">(Optional)</span></label>
+      <input type="datetime-local" id="startTime">
+
+      <label for="endTime">Close Time <span class="optional-tag">(Optional)</span></label>
+      <input type="datetime-local" id="endTime">
+
+      <button id="genBtn" onclick="generateQR()">Create Classroom QR</button>
+
+      <div id="qrResult" style="display: none;">
+        <div id="qrcode"></div>
+        <div class="session-info" id="windowInfo"></div>
+      </div>
+    </div>
+
+    <!-- VIEW B: STUDENT SUBMISSION -->
+    <div id="studentView" style="display: none;">
+      <h2>Record Attendance</h2>
+      <form id="attendanceForm">
+        <label for="studentId">Student ID</label>
+        <input type="text" id="studentId" required pattern="[0-9]+" placeholder="e.g. 20261045">
+
+        <label for="name">Full Name (in Arabic)</label>
+        <input type="text" id="name" required minlength="5" placeholder="Full Name">
+
+        <!-- Select Group Dropdown -->
+        <label for="groupSelect">Select Group / Section</label>
+        <select id="groupSelect" required>
+          <option value="" disabled selected>-- Choose your group --</option>
+          <optgroup label="Group A">
+            <option value="A1">A1</option>
+            <option value="A2">A2</option>
+            <option value="A3">A3</option>
+            <option value="A4">A4</option>
+            <option value="A5">A5</option>
+            <option value="A6">A6</option>
+          </optgroup>
+          <optgroup label="Group B">
+            <option value="B1">B1</option>
+            <option value="B2">B2</option>
+            <option value="B3">B3</option>
+            <option value="B4">B4</option>
+            <option value="B5">B5</option>
+            <option value="B6">B6</option>
+          </optgroup>
+          <optgroup label="Group C">
+            <option value="C1">C1</option>
+            <option value="C2">C2</option>
+            <option value="C3">C3</option>
+            <option value="C4">C4</option>
+            <option value="C5">C5</option>
+            <option value="C6">C6</option>
+          </optgroup>
+        </select>
+
+        <button type="submit" id="submitBtn">Submit Attendance</button>
+      </form>
+    </div>
+
+    <p id="statusMsg" class="status-msg"></p>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7y3qlQNRcCTMvkKkK5pYv78fSw0nYtUNyGt0A-ya45QHF_0TA4aq3xR4wx71kXN4/exec";
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const sheetId = urlParams.get("sheetId");
+    const startMs = urlParams.get("start");
+    const endMs = urlParams.get("end");
+    const sessionToken = urlParams.get("token") || "";
+
+    if (sheetId) {
+      document.getElementById("studentView").style.display = "block";
+      initStudentView();
+    } else {
+      document.getElementById("teacherView").style.display = "block";
+    }
+
+    function extractSheetId(input) {
+      const match = input.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      return match ? match[1] : input.trim();
+    }
+
+    async function generateQR() {
+      const input = document.getElementById("sheetInput").value.trim();
+      const startVal = document.getElementById("startTime").value;
+      const endVal = document.getElementById("endTime").value;
+      const genBtn = document.getElementById("genBtn");
+
+      if (!input) return alert("Please enter a Google Sheet URL or ID.");
+
+      const cleanSheetId = extractSheetId(input);
+      const cleanBaseUrl = window.location.origin + window.location.pathname;
+
+      let studentUrl = `${cleanBaseUrl}?sheetId=${cleanSheetId}`;
+      let windowText = "<b>Mode:</b> Always Open (No time limits)";
+
+      if (startVal && endVal) {
+        const sMs = new Date(startVal).getTime();
+        const eMs = new Date(endVal).getTime();
+
+        if (eMs <= sMs) return alert("Close time must be after Open time.");
+
+        genBtn.disabled = true;
+        genBtn.innerText = "Generating token...";
+
+        try {
+          const res = await fetch(`${APPS_SCRIPT_URL}?action=sign&sheetId=${cleanSheetId}&start=${sMs}&end=${eMs}`);
+          const signData = await res.json();
+          studentUrl += `&start=${sMs}&end=${eMs}&token=${signData.token}`;
+        } catch(e) {
+          alert("Could not create signed token: " + e.message);
+          genBtn.disabled = false;
+          genBtn.innerText = "Create Classroom QR";
+          return;
+        }
+
+        genBtn.disabled = false;
+        genBtn.innerText = "Create Classroom QR";
+
+        windowText = `
+          <b>Active Window:</b><br>
+          🟢 Opens: ${new Date(sMs).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}<br>
+          🔴 Closes: ${new Date(eMs).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+        `;
+      }
+
+      const qrDiv = document.getElementById("qrcode");
+      qrDiv.innerHTML = "";
+      new QRCode(qrDiv, { text: studentUrl, width: 220, height: 220 });
+
+      document.getElementById("windowInfo").innerHTML = windowText;
+      document.getElementById("qrResult").style.display = "block";
+    }
+
+    function getDeviceUUID() {
+      let uuid = localStorage.getItem("att_device_uuid");
+      if (!uuid) {
+        uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+        localStorage.setItem("att_device_uuid", uuid);
+      }
+      return uuid;
+    }
+
+    function initStudentView() {
+      const msg = document.getElementById("statusMsg");
+
+      if (startMs && endMs) {
+        const now = Date.now();
+        const s = parseInt(startMs, 10);
+        const e = parseInt(endMs, 10);
+
+        if (now < s) {
+          msg.style.color = "#d9534f";
+          msg.innerText = "Attendance is not open yet. Opens: " + new Date(s).toLocaleString();
+          document.getElementById("submitBtn").disabled = true;
+        } else if (now > e) {
+          msg.style.color = "#d9534f";
+          msg.innerText = "Attendance window has closed for this session.";
+          document.getElementById("submitBtn").disabled = true;
+        }
+      }
+
+      document.getElementById("attendanceForm").addEventListener("submit", async ev => {
+        ev.preventDefault();
+        const submitBtn = document.getElementById("submitBtn");
+        submitBtn.disabled = true;
+        msg.style.color = "#333";
+        msg.innerText = "Submitting attendance...";
+
+        let lat = 0, lon = 0;
+        if (navigator.geolocation) {
+          try {
+            const pos = await new Promise((res, rej) => 
+              navigator.geolocation.getCurrentPosition(res, rej, { timeout: 3000, enableHighAccuracy: false })
+            );
+            lat = pos.coords.latitude;
+            lon = pos.coords.longitude;
+          } catch(err) {
+            console.warn("Location unavailable:", err.message);
+          }
+        }
+
+        try {
+          const payload = {
+            sheetId: sheetId,
+            startTime: startMs || "",
+            endTime: endMs || "",
+            token: sessionToken,
+            studentId: document.getElementById("studentId").value.trim(),
+            name: document.getElementById("name").value.trim(),
+            group: document.getElementById("groupSelect").value,
+            latitude: lat,
+            longitude: lon,
+            deviceUuid: getDeviceUUID()
+          };
+
+          const res = await fetch(APPS_SCRIPT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await res.json();
+          if (data.status === "success") {
+            msg.style.color = "#28a745";
+            msg.innerText = data.message;
+            document.getElementById("attendanceForm").reset();
+          } else {
+            msg.style.color = "#d9534f";
+            msg.innerText = data.message;
+            submitBtn.disabled = false;
+          }
+        } catch (err) {
+          msg.style.color = "#d9534f";
+          msg.innerText = "Submission failed: " + err.message;
+          submitBtn.disabled = false;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
