@@ -46,11 +46,12 @@
     <div id="studentView" style="display: none;">
       <h2>Record Attendance</h2>
       <form id="attendanceForm">
+        <!-- Student ID now accepts ANY string format -->
         <label for="studentId">Student ID</label>
-        <input type="text" id="studentId" required pattern="[0-9]+" placeholder="e.g. 20261045">
+        <input type="text" id="studentId" required placeholder="Enter ID (any format)">
 
         <label for="name">Full Name (in Arabic)</label>
-        <input type="text" id="name" required minlength="5" placeholder="Full Name">
+        <input type="text" id="name" required minlength="3" placeholder="Full Name">
 
         <!-- Select Group Dropdown -->
         <label for="groupSelect">Select Group / Section</label>
@@ -174,6 +175,28 @@
       return uuid;
     }
 
+    // Helper: Promisified location request with fallback
+    function fetchCurrentPosition() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          return resolve({ lat: 0, lon: 0 });
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+          (err) => {
+            console.warn("High accuracy geolocation error:", err.message);
+            // Fallback try without high accuracy
+            navigator.geolocation.getCurrentPosition(
+              (pos2) => resolve({ lat: pos2.coords.latitude, lon: pos2.coords.longitude }),
+              () => resolve({ lat: 0, lon: 0 }),
+              { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+            );
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+        );
+      });
+    }
+
     function initStudentView() {
       const msg = document.getElementById("statusMsg");
 
@@ -186,10 +209,12 @@
           msg.style.color = "#d9534f";
           msg.innerText = "Attendance is not open yet. Opens: " + new Date(s).toLocaleString();
           document.getElementById("submitBtn").disabled = true;
+          return;
         } else if (now > e) {
           msg.style.color = "#d9534f";
           msg.innerText = "Attendance window has closed for this session.";
           document.getElementById("submitBtn").disabled = true;
+          return;
         }
       }
 
@@ -197,21 +222,10 @@
         ev.preventDefault();
         const submitBtn = document.getElementById("submitBtn");
         submitBtn.disabled = true;
-        msg.style.color = "#333";
-        msg.innerText = "Submitting attendance...";
+        msg.style.color = "#0066cc";
+        msg.innerText = "Getting location & submitting attendance...";
 
-        let lat = 0, lon = 0;
-        if (navigator.geolocation) {
-          try {
-            const pos = await new Promise((res, rej) => 
-              navigator.geolocation.getCurrentPosition(res, rej, { timeout: 3000, enableHighAccuracy: false })
-            );
-            lat = pos.coords.latitude;
-            lon = pos.coords.longitude;
-          } catch(err) {
-            console.warn("Location unavailable:", err.message);
-          }
-        }
+        const location = await fetchCurrentPosition();
 
         try {
           const payload = {
@@ -222,8 +236,8 @@
             studentId: document.getElementById("studentId").value.trim(),
             name: document.getElementById("name").value.trim(),
             group: document.getElementById("groupSelect").value,
-            latitude: lat,
-            longitude: lon,
+            latitude: location.lat,
+            longitude: location.lon,
             deviceUuid: getDeviceUUID()
           };
 
