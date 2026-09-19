@@ -77,9 +77,6 @@
     <label for="endTime">Closes</label>
     <input type="datetime-local" id="endTime">
 
-    <label for="adminKey">Teacher password <span class="hint">— only if one is set in the script</span></label>
-    <input type="password" id="adminKey" autocomplete="off">
-
     <button id="genBtn">Create QR code</button>
 
     <div id="qrbox">
@@ -124,7 +121,7 @@
 <script>
 /* Paste the /exec URL of your Apps Script deployment here.
    It changes every time you deploy a NEW version. */
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwhdgQrxhli7-xQVIVdvG-aK97mHovu4TUACfyx8TV7ns9OiMbZF8tzhmBsT7JIr9c-/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyacd3SCWeyzAEjLf1QbGez-7F74MYrNK2ztR5iB4W1wl73XY7gyjYoujBRlo-_SFc/exec";
 
 const params  = new URLSearchParams(location.search);
 const sheetId = params.get("sheetId");
@@ -136,7 +133,6 @@ else         { $("teacherView").hidden = false; startTeacher(); }
 /* ======================= TEACHER ======================= */
 
 function startTeacher() {
-  $("adminKey").value = localStorage.getItem("att_admin_key") || "";
   $("genBtn").addEventListener("click", createQR);
   $("copyBtn").addEventListener("click", () => {
     navigator.clipboard.writeText($("copyBtn").dataset.url || "")
@@ -155,8 +151,6 @@ async function createQR() {
   if (!raw) return alert("Paste the Google Sheet link first.");
 
   const id  = extractSheetId(raw);
-  const key = $("adminKey").value.trim();
-  localStorage.setItem("att_admin_key", key);
 
   const sVal = $("startTime").value, eVal = $("endTime").value;
   let start = 0, end = 0;
@@ -172,11 +166,11 @@ async function createQR() {
   let res;
   try {
     const url = `${APPS_SCRIPT_URL}?action=create&sheetId=${encodeURIComponent(id)}`
-              + `&start=${start}&end=${end}&key=${encodeURIComponent(key)}`;
+              + `&start=${start}&end=${end}`;
     const r = await fetch(url, { redirect: "follow" });
     const text = await r.text();
     try { res = JSON.parse(text); }
-    catch { throw new Error("The script returned a login page. Re-deploy it with access set to Anyone."); }
+    catch { throw new Error("The script needs a one-time authorization. In the Apps Script editor, run the setup() function once and approve the permission prompt, then try again."); }
     if (res.status === "error") throw new Error(res.message);
   } catch (err) {
     btn.disabled = false; btn.textContent = "Create QR code";
@@ -349,7 +343,7 @@ function startStudent() {
       const text = await r.text();
       let data;
       try { data = JSON.parse(text); }
-      catch { throw new Error("The script returned a login page. Ask your teacher to re-deploy it with access set to Anyone."); }
+      catch { throw new Error("The attendance script isn't ready yet. Ask your teacher to run setup() once in the Apps Script editor."); }
 
       if (data.status === "success") {
         show(data.message, "ok");
