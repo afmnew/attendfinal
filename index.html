@@ -1,308 +1,372 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Attendance Portal</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; box-sizing: border-box; }
-    .card { background: #ffffff; width: 100%; max-width: 440px; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-    h2 { margin-top: 0; color: #1a1a1a; font-size: 22px; text-align: center; }
-    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-top: 12px; margin-bottom: 4px; }
-    .optional-tag { font-weight: normal; color: #777; font-size: 12px; }
-    input[type="text"], input[type="datetime-local"], select { width: 100%; padding: 10px 12px; border: 1px solid #ccd0d5; border-radius: 6px; font-size: 15px; box-sizing: border-box; background-color: #fff; }
-    button { width: 100%; padding: 12px; background-color: #0066cc; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; margin-top: 18px; cursor: pointer; }
-    button:disabled { background-color: #999; cursor: not-allowed; }
-    #qrcode { display: flex; justify-content: center; margin: 20px 0; }
-    .status-msg { margin-top: 15px; font-size: 14px; font-weight: 500; text-align: center; line-height: 1.4; }
-    .session-info { background: #eaf3ff; border-left: 4px solid #0066cc; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 15px; }
-    .instructions { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 13px; color: #333; line-height: 1.5; margin-bottom: 15px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Attendance</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#16202c; --muted:#5d6b7a; --line:#dfe4ea;
+    --bg:#eef1f5; --card:#ffffff; --accent:#2f5bd7;
+    --ok:#137a45; --okbg:#e7f6ed; --bad:#b3261e; --badbg:#fdecea;
+    --wait:#8a6100; --waitbg:#fdf3dd;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:16px; min-height:100vh; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    font-size:16px; line-height:1.5;
+    display:flex; justify-content:center; align-items:flex-start;
+  }
+  .card{width:100%; max-width:430px; background:var(--card); border:1px solid var(--line);
+        border-radius:var(--radius); padding:22px; margin:auto}
+  h1{font-size:21px; margin:0 0 4px; letter-spacing:-.01em}
+  .sub{color:var(--muted); font-size:14px; margin:0 0 18px}
+  label{display:block; font-size:14px; font-weight:600; margin:14px 0 5px}
+  .hint{font-weight:400; color:var(--muted)}
+  input,select{width:100%; padding:11px 12px; font-size:16px; font-family:inherit; color:var(--ink);
+    background:#fff; border:1px solid var(--line); border-radius:8px}
+  input:focus,select:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  button{width:100%; margin-top:20px; padding:13px; font-size:16px; font-weight:600; font-family:inherit;
+    color:#fff; background:var(--accent); border:0; border-radius:8px; cursor:pointer}
+  button:disabled{background:#b6bfcc; cursor:not-allowed}
+  button.link{background:none; color:var(--accent); border:1px solid var(--line); margin-top:10px}
+  .steps{font-size:14px; color:var(--muted); background:#f7f9fc; border:1px solid var(--line);
+         border-radius:8px; padding:12px 12px 12px 30px; margin:0 0 6px}
+  .steps li{margin:4px 0}
+  .pill{display:flex; gap:9px; align-items:flex-start; font-size:14px; padding:10px 12px;
+        border-radius:8px; margin-top:16px}
+  .pill.ok{background:var(--okbg); color:var(--ok)}
+  .pill.bad{background:var(--badbg); color:var(--bad)}
+  .pill.wait{background:var(--waitbg); color:var(--wait)}
+  .dot{width:9px; height:9px; border-radius:50%; background:currentColor; margin-top:7px; flex:0 0 auto}
+  .pill.wait .dot{animation:blink 1.1s infinite}
+  @keyframes blink{50%{opacity:.25}}
+  @media (prefers-reduced-motion:reduce){.pill.wait .dot{animation:none}}
+  .msg{font-size:14px; margin-top:16px; text-align:center; min-height:20px}
+  #qrbox{display:none; margin-top:20px; text-align:center}
+  #qrcode{display:flex; justify-content:center; padding:14px 0}
+  .window{font-size:14px; color:var(--muted); background:#f7f9fc; border:1px solid var(--line);
+          border-radius:8px; padding:10px; text-align:left}
+  .urlbox{font-size:12px; color:var(--muted); word-break:break-all; margin-top:10px}
+</style>
 </head>
 <body>
 
-  <div class="card">
-    <!-- VIEW A: TEACHER GENERATOR -->
-    <div id="teacherView" style="display: none;">
-      <h2>Generate Attendance QR</h2>
-      <div class="instructions">
-        <strong>Instructions:</strong>
-        <ol style="margin: 8px 0 0 0; padding-left: 20px;">
-          <li>Create a new blank <a href="https://sheets.new" target="_blank">Google Sheet</a>.</li>
-          <li>Click <strong>Share</strong> and add the administrator's email as an <strong>Editor</strong>.</li>
-          <li>Paste your Google Sheet link below and click <strong>Create Classroom QR</strong>.</li>
-        </ol>
-      </div>
+<div class="card">
 
-      <label for="sheetInput">Google Sheet Link</label>
-      <input type="text" id="sheetInput" placeholder="Paste link here">
+  <!-- ===================== TEACHER ===================== -->
+  <div id="teacherView" hidden>
+    <h1>Create an attendance QR</h1>
+    <p class="sub">One sheet per session. Students scan the code once.</p>
 
-      <label for="startTime">Open Time <span class="optional-tag">(Optional)</span></label>
-      <input type="datetime-local" id="startTime">
+    <ol class="steps">
+      <li>Open a blank <a href="https://sheets.new" target="_blank" rel="noopener">Google Sheet</a>.</li>
+      <li>Share it as <strong>Editor</strong> with the account that owns the Apps Script.</li>
+      <li>Paste the sheet link below.</li>
+    </ol>
 
-      <label for="endTime">Close Time <span class="optional-tag">(Optional)</span></label>
-      <input type="datetime-local" id="endTime">
+    <label for="sheetInput">Google Sheet link</label>
+    <input type="text" id="sheetInput" placeholder="https://docs.google.com/spreadsheets/d/..." autocomplete="off">
 
-      <button id="genBtn" onclick="generateQR()">Create Classroom QR</button>
+    <label for="startTime">Opens <span class="hint">— leave both empty for no time limit</span></label>
+    <input type="datetime-local" id="startTime">
 
-      <div id="qrResult" style="display: none;">
-        <div id="qrcode"></div>
-        <div class="session-info" id="windowInfo"></div>
-      </div>
+    <label for="endTime">Closes</label>
+    <input type="datetime-local" id="endTime">
+
+    <label for="adminKey">Teacher password <span class="hint">— only if one is set in the script</span></label>
+    <input type="password" id="adminKey" autocomplete="off">
+
+    <button id="genBtn">Create QR code</button>
+
+    <div id="qrbox">
+      <div id="qrcode"></div>
+      <div class="window" id="windowInfo"></div>
+      <div class="urlbox" id="studentLink"></div>
+      <button class="link" id="copyBtn">Copy student link</button>
     </div>
-
-    <!-- VIEW B: STUDENT SUBMISSION -->
-    <div id="studentView" style="display: none;">
-      <h2>Record Attendance</h2>
-      <form id="attendanceForm">
-        <label for="studentId">Student ID</label>
-        <input type="text" id="studentId" required placeholder="Enter ID">
-
-        <label for="name">Full Name (in Arabic)</label>
-        <input type="text" id="name" required minlength="3" placeholder="Full Name">
-
-        <!-- Select Group Dropdown -->
-        <label for="groupSelect">Select Group</label>
-        <select id="groupSelect" required>
-          <option value="" disabled selected>-- Choose your group --</option>
-          <optgroup label="Group A">
-            <option value="A1">A1</option>
-            <option value="A2">A2</option>
-            <option value="A3">A3</option>
-            <option value="A4">A4</option>
-            <option value="A5">A5</option>
-            <option value="A6">A6</option>
-          </optgroup>
-          <optgroup label="Group B">
-            <option value="B1">B1</option>
-            <option value="B2">B2</option>
-            <option value="B3">B3</option>
-            <option value="B4">B4</option>
-            <option value="B5">B5</option>
-            <option value="B6">B6</option>
-          </optgroup>
-          <optgroup label="Group C">
-            <option value="C1">C1</option>
-            <option value="C2">C2</option>
-            <option value="C3">C3</option>
-            <option value="C4">C4</option>
-            <option value="C5">C5</option>
-            <option value="C6">C6</option>
-          </optgroup>
-        </select>
-
-        <button type="submit" id="submitBtn">Submit Attendance</button>
-      </form>
-    </div>
-
-    <p id="statusMsg" class="status-msg"></p>
   </div>
 
-  <script>
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFsDMMj86NrnnQKJ3c8yKhLF90W2nDBLd08Nun6gHXG-OwMM05HZWdvU7oV6qeu8tm/exec";
+  <!-- ===================== STUDENT ===================== -->
+  <div id="studentView" hidden>
+    <h1>Record your attendance</h1>
+    <p class="sub" id="sessionSub">Checking the session…</p>
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const sheetId = urlParams.get("sheetId");
-    const startMs = urlParams.get("start");
-    const endMs = urlParams.get("end");
-    const sessionToken = urlParams.get("token") || "";
+    <form id="form" novalidate>
+      <label for="studentId">Student ID</label>
+      <input type="text" id="studentId" inputmode="numeric" autocomplete="off" required>
 
-    if (sheetId) {
-      document.getElementById("studentView").style.display = "block";
-      initStudentView();
-    } else {
-      document.getElementById("teacherView").style.display = "block";
-    }
+      <label for="name">Full name (Arabic)</label>
+      <input type="text" id="name" dir="rtl" minlength="3" required>
 
-    function extractSheetId(input) {
-      const match = input.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      return match ? match[1] : input.trim();
-    }
+      <label for="groupSelect">Group</label>
+      <select id="groupSelect" required>
+        <option value="" disabled selected>Choose your group</option>
+        <optgroup label="A"><option>A1</option><option>A2</option><option>A3</option><option>A4</option><option>A5</option><option>A6</option></optgroup>
+        <optgroup label="B"><option>B1</option><option>B2</option><option>B3</option><option>B4</option><option>B5</option><option>B6</option></optgroup>
+        <optgroup label="C"><option>C1</option><option>C2</option><option>C3</option><option>C4</option><option>C5</option><option>C6</option></optgroup>
+      </select>
 
-    async function generateQR() {
-      const input = document.getElementById("sheetInput").value.trim();
-      const startVal = document.getElementById("startTime").value;
-      const endVal = document.getElementById("endTime").value;
-      const genBtn = document.getElementById("genBtn");
+      <div class="pill wait" id="locPill"><span class="dot"></span><span id="locText">Finding your location…</span></div>
+      <button class="link" id="retryLoc" hidden>Try location again</button>
 
-      if (!input) return alert("Please enter a Google Sheet URL or ID.");
+      <button type="submit" id="submitBtn" disabled>Submit attendance</button>
+    </form>
 
-      const cleanSheetId = extractSheetId(input);
-      const cleanBaseUrl = window.location.origin + window.location.pathname;
+    <p class="msg" id="msg"></p>
+  </div>
 
-      let studentUrl = `${cleanBaseUrl}?sheetId=${cleanSheetId}`;
-      let windowText = "<b>Mode:</b> Always Open (No time limits)";
+</div>
 
-      if (startVal && endVal) {
-        const sMs = new Date(startVal).getTime();
-        const eMs = new Date(endVal).getTime();
+<script>
+/* Paste the /exec URL of your Apps Script deployment here.
+   It changes every time you deploy a NEW version. */
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwhdgQrxhli7-xQVIVdvG-aK97mHovu4TUACfyx8TV7ns9OiMbZF8tzhmBsT7JIr9c-/exec";
 
-        if (eMs <= sMs) return alert("Close time must be after Open time.");
+const params  = new URLSearchParams(location.search);
+const sheetId = params.get("sheetId");
+const $ = id => document.getElementById(id);
 
-        genBtn.disabled = true;
-        genBtn.innerText = "Generating token...";
+if (sheetId) { $("studentView").hidden = false; startStudent(); }
+else         { $("teacherView").hidden = false; startTeacher(); }
 
-        try {
-          const res = await fetch(`${APPS_SCRIPT_URL}?action=sign&sheetId=${cleanSheetId}&start=${sMs}&end=${eMs}`, {
-            redirect: "follow"
-          });
-          const rawText = await res.text();
-          let signData;
-          try {
-            signData = JSON.parse(rawText);
-          } catch (e) {
-            throw new Error("Apps Script returned HTML. Ensure the deployment allows access to 'Anyone'.");
-          }
+/* ======================= TEACHER ======================= */
 
-          studentUrl += `&start=${sMs}&end=${eMs}&token=${signData.token}`;
-        } catch (e) {
-          alert("Could not create signed token: " + e.message);
-          genBtn.disabled = false;
-          genBtn.innerText = "Create Classroom QR";
-          return;
-        }
+function startTeacher() {
+  $("adminKey").value = localStorage.getItem("att_admin_key") || "";
+  $("genBtn").addEventListener("click", createQR);
+  $("copyBtn").addEventListener("click", () => {
+    navigator.clipboard.writeText($("copyBtn").dataset.url || "")
+      .then(() => { $("copyBtn").textContent = "Copied"; setTimeout(() => $("copyBtn").textContent = "Copy student link", 1500); });
+  });
+}
 
-        genBtn.disabled = false;
-        genBtn.innerText = "Create Classroom QR";
+function extractSheetId(v) {
+  const m = v.match(/\/d\/([a-zA-Z0-9-_]{20,})/);
+  return m ? m[1] : v.trim();
+}
 
-        windowText = `
-          <b>Active Window:</b><br>
-          🟢 Opens: ${new Date(sMs).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}<br>
-          🔴 Closes: ${new Date(eMs).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-        `;
-      }
+async function createQR() {
+  const btn = $("genBtn");
+  const raw = $("sheetInput").value.trim();
+  if (!raw) return alert("Paste the Google Sheet link first.");
 
-      const qrDiv = document.getElementById("qrcode");
-      qrDiv.innerHTML = "";
-      new QRCode(qrDiv, { text: studentUrl, width: 220, height: 220 });
+  const id  = extractSheetId(raw);
+  const key = $("adminKey").value.trim();
+  localStorage.setItem("att_admin_key", key);
 
-      document.getElementById("windowInfo").innerHTML = windowText;
-      document.getElementById("qrResult").style.display = "block";
-    }
+  const sVal = $("startTime").value, eVal = $("endTime").value;
+  let start = 0, end = 0;
+  if (sVal && eVal) {
+    start = new Date(sVal).getTime();
+    end   = new Date(eVal).getTime();
+    if (end <= start) return alert("The closing time must be after the opening time.");
+  } else if (sVal || eVal) {
+    return alert("Set both times, or leave both empty.");
+  }
 
-    function getDeviceUUID() {
-      let uuid = localStorage.getItem("att_device_uuid");
-      if (!uuid) {
-        uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-          const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
+  btn.disabled = true; btn.textContent = "Registering session…";
+  let res;
+  try {
+    const url = `${APPS_SCRIPT_URL}?action=create&sheetId=${encodeURIComponent(id)}`
+              + `&start=${start}&end=${end}&key=${encodeURIComponent(key)}`;
+    const r = await fetch(url, { redirect: "follow" });
+    const text = await r.text();
+    try { res = JSON.parse(text); }
+    catch { throw new Error("The script returned a login page. Re-deploy it with access set to Anyone."); }
+    if (res.status === "error") throw new Error(res.message);
+  } catch (err) {
+    btn.disabled = false; btn.textContent = "Create QR code";
+    return alert(err.message);
+  }
+  btn.disabled = false; btn.textContent = "Create QR code";
+
+  let studentUrl = `${location.origin}${location.pathname}?sheetId=${id}`;
+  let info = "No time limit — the sheet accepts submissions until you create a new QR with times.";
+  if (res.mode === "timed") {
+    studentUrl += `&start=${start}&end=${end}&token=${res.token}`;
+    info = `Opens ${fmt(start)}<br>Closes ${fmt(end)}`;
+  }
+
+  $("qrcode").innerHTML = "";
+  new QRCode($("qrcode"), { text: studentUrl, width: 220, height: 220 });
+  $("windowInfo").innerHTML = info;
+  $("studentLink").textContent = studentUrl;
+  $("copyBtn").dataset.url = studentUrl;
+  $("qrbox").style.display = "block";
+}
+
+const fmt = ms => new Date(Number(ms)).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+
+/* ======================= STUDENT ======================= */
+
+let fix = null;            // { lat, lon, acc, t }
+let sessionOpen = false;
+let watchId = null;
+
+function deviceUuid() {
+  let u = localStorage.getItem("att_device_uuid");
+  if (!u) {
+    u = (crypto.randomUUID)
+      ? crypto.randomUUID()
+      : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
         });
-        localStorage.setItem("att_device_uuid", uuid);
-      }
-      return uuid;
+    localStorage.setItem("att_device_uuid", u);
+  }
+  return u;
+}
+
+function setPill(kind, text) {
+  const p = $("locPill");
+  p.className = "pill " + kind;
+  $("locText").textContent = text;
+}
+
+function readyCheck() {
+  $("submitBtn").disabled = !(fix && sessionOpen);
+}
+
+/* Location is requested the moment the page opens, so by the time the
+   student finishes typing there is already a fix waiting. */
+function startLocation() {
+  if (!navigator.geolocation) {
+    setPill("bad", "This browser cannot share location. Open the link in Chrome or Safari.");
+    return;
+  }
+  if (!isSecureContext) {
+    setPill("bad", "Location needs an https link. Ask your teacher for the https address.");
+    return;
+  }
+  setPill("wait", "Finding your location…");
+  $("retryLoc").hidden = true;
+
+  const onFix = pos => {
+    fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: Date.now() };
+    setPill("ok", `Location found (±${Math.round(fix.acc)} m)`);
+    readyCheck();
+  };
+  const onErr = err => {
+    if (fix) return;                       // already have something usable
+    const text = err.code === 1 ? "Location blocked. Allow location for this site, then tap the button below."
+               : err.code === 2 ? "No GPS signal. Turn on location, then try again."
+               : "Location took too long. Tap the button below to retry.";
+    setPill("bad", text);
+    $("retryLoc").hidden = false;
+    readyCheck();
+  };
+
+  // A cached fix arrives almost instantly; the watch then refines it.
+  navigator.geolocation.getCurrentPosition(onFix, () => {}, { enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 });
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(onFix, onErr, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+
+async function checkSession() {
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=session&sheetId=${encodeURIComponent(sheetId)}`, { redirect: "follow" });
+    const d = JSON.parse(await r.text());
+    if (d.status === "open") {
+      sessionOpen = true;
+      $("sessionSub").textContent = d.end ? `Open until ${fmt(d.end)}.` : "This session is open.";
+    } else {
+      sessionOpen = false;
+      $("sessionSub").textContent = d.message || "This session is closed.";
+      $("form").hidden = true;
+      show(d.message || "This session is closed.", "bad");
+    }
+  } catch (e) {
+    // Never block a student because of a flaky network: the server
+    // re-checks the window when the form is submitted anyway.
+    sessionOpen = true;
+    $("sessionSub").textContent = "Fill in your details and submit.";
+  }
+  readyCheck();
+}
+
+function show(text, kind) {
+  const m = $("msg");
+  m.textContent = text;
+  m.style.color = kind === "ok" ? "var(--ok)" : kind === "bad" ? "var(--bad)" : "var(--muted)";
+}
+
+function freshFix() {
+  return new Promise(resolve => {
+    if (fix && Date.now() - fix.t < 180000) return resolve(fix);
+    navigator.geolocation.getCurrentPosition(
+      pos => { fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: Date.now() }; resolve(fix); },
+      () => resolve(fix),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  });
+}
+
+function startStudent() {
+  startLocation();
+  checkSession();
+  $("retryLoc").addEventListener("click", e => { e.preventDefault(); startLocation(); });
+
+  $("form").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const btn = $("submitBtn");
+    const id = $("studentId").value.trim();
+    const name = $("name").value.trim();
+    const group = $("groupSelect").value;
+
+    if (!id)               return show("Enter your student ID.", "bad");
+    if (name.length < 3)   return show("Enter your full name.", "bad");
+    if (!group)            return show("Choose your group.", "bad");
+
+    btn.disabled = true;
+    show("Sending…", "muted");
+
+    const loc = await freshFix();
+    if (!loc) {
+      show("Location is still not available. Turn on GPS and tap “Try location again”.", "bad");
+      btn.disabled = false;
+      return;
     }
 
-    // High-speed location lookup: checks cached hardware GPS first, 4s hard timeout
-    function fetchCurrentPosition() {
-      return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          return reject(new Error("Geolocation is not supported by your browser."));
-        }
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-          (err) => {
-            let reason = "Please enable GPS/Location in your browser settings to submit attendance.";
-            if (err.code === 1) reason = "Location permission denied. Please allow location access in your browser.";
-            else if (err.code === 2) reason = "GPS signal unavailable. Please ensure phone location is enabled.";
-            else if (err.code === 3) reason = "Location request timed out. Please try again with GPS turned on.";
-            reject(new Error(reason));
-          },
-          { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
-        );
+    try {
+      const r = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        redirect: "follow",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },  // avoids a CORS preflight
+        body: JSON.stringify({
+          sheetId, studentId: id, name, group,
+          latitude: loc.lat, longitude: loc.lon, accuracy: loc.acc,
+          deviceUuid: deviceUuid(),
+          startTime: params.get("start") || "",
+          endTime: params.get("end") || "",
+          token: params.get("token") || ""
+        })
       });
-    }
 
-    function initStudentView() {
-      const msg = document.getElementById("statusMsg");
+      const text = await r.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch { throw new Error("The script returned a login page. Ask your teacher to re-deploy it with access set to Anyone."); }
 
-      // Prime device location silently in the background on load
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(() => {}, () => {}, { timeout: 2000, maximumAge: 60000 });
+      if (data.status === "success") {
+        show(data.message, "ok");
+        $("form").hidden = true;
+        if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      } else {
+        show(data.message, "bad");
+        // Duplicates and closed windows are final; everything else can be retried.
+        const final = ["duplicate", "duplicate_device", "expired", "not_started"];
+        btn.disabled = final.includes(data.status);
       }
-
-      if (startMs && endMs) {
-        const now = Date.now();
-        const s = parseInt(startMs, 10);
-        const e = parseInt(endMs, 10);
-
-        if (now < s) {
-          msg.style.color = "#d9534f";
-          msg.innerText = "Attendance is not open yet. Opens: " + new Date(s).toLocaleString();
-          document.getElementById("submitBtn").disabled = true;
-          return;
-        } else if (now > e) {
-          msg.style.color = "#d9534f";
-          msg.innerText = "Attendance window has closed for this session.";
-          document.getElementById("submitBtn").disabled = true;
-          return;
-        }
-      }
-
-      document.getElementById("attendanceForm").addEventListener("submit", async ev => {
-        ev.preventDefault();
-        const submitBtn = document.getElementById("submitBtn");
-        submitBtn.disabled = true;
-        msg.style.color = "#0066cc";
-        msg.innerText = "Checking location...";
-
-        let location;
-        try {
-          location = await fetchCurrentPosition();
-        } catch (locErr) {
-          msg.style.color = "#d9534f";
-          msg.innerText = "❌ " + locErr.message;
-          submitBtn.disabled = false;
-          return;
-        }
-
-        msg.innerText = "Submitting attendance...";
-
-        try {
-          const payload = {
-            sheetId: sheetId,
-            startTime: startMs || "",
-            endTime: endMs || "",
-            token: sessionToken,
-            studentId: document.getElementById("studentId").value.trim(),
-            name: document.getElementById("name").value.trim(),
-            group: document.getElementById("groupSelect").value,
-            latitude: location.lat,
-            longitude: location.lon,
-            deviceUuid: getDeviceUUID()
-          };
-
-          const res = await fetch(APPS_SCRIPT_URL, {
-            method: "POST",
-            redirect: "follow",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload)
-          });
-
-          const rawText = await res.text();
-          let data;
-          try {
-            data = JSON.parse(rawText);
-          } catch (jsonErr) {
-            throw new Error("Server returned HTML instead of JSON. Ensure Apps Script deployment is set to 'Anyone' and updated to a New Version.");
-          }
-
-          if (data.status === "success") {
-            msg.style.color = "#28a745";
-            msg.innerText = data.message;
-            document.getElementById("attendanceForm").reset();
-          } else {
-            msg.style.color = "#d9534f";
-            msg.innerText = data.message;
-            submitBtn.disabled = false;
-          }
-        } catch (err) {
-          msg.style.color = "#d9534f";
-          msg.innerText = "Submission failed: " + err.message;
-          submitBtn.disabled = false;
-        }
-      });
+    } catch (err) {
+      show(err.message, "bad");
+      btn.disabled = false;
     }
-  </script>
+  });
+}
+</script>
 </body>
 </html>
